@@ -19,7 +19,11 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
         return;
     }
 
-    speed = VectorLength( cg.predictedPlayerState.velocity );
+    vec3_t xyvel;
+    xyvel[0] = cg.predictedPlayerState.velocity[0];
+    xyvel[1] = cg.predictedPlayerState.velocity[1];
+    xyvel[2] = 0;
+    speed = VectorLength(xyvel);
     velocity_angle = RAD2DEG( atan2( cg.predictedPlayerState.velocity[1], cg.predictedPlayerState.velocity[0] ) );
 
     accel = cg.snap->ps.speed * (pmove_msec.value / 1000.0f);
