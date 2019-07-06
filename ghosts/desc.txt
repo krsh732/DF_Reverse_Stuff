@@ -1,0 +1,171 @@
+Quake 3 DeFRaG Ghost Files
+
+=== .grec ===
+
+- `defrag/system/ghosts` contains .grec files
+
+- These grec files serve two purposes:
+	- They indicate which autorecorded ghost is the best
+	- They also indirectly indicate which ghosts can be overwritten to autorecord new ghosts
+
+The grec files have the following format:
+	`mapname_df_phys_bestghostnumber time`
+
+- DeFRaG then uses this information to autoload the best ghost file (if appropriate cvars are set).
+
+- The ghost files by default have the extension `.boo_01`
+
+
+=== .boo_01 ===
+
+- The first 28 bytes of the file seem to be a header and can be organized as:
+
+struct {
+    int magic;
+    int ghostVersion;
+    int serverVersion;
+    char mapname[16];
+} header;
+
+- Not really sure what int magic is though.. (DF complains if it isn't 1)
+
+- After the header, the file contains 'snapshots'
+
+- These 'snapshots' have 'packets' in them
+
+- Each packet has an integer type number that can be a value from 2-8 (inclusive).
+
+The purpose of each packet type is as follows:
+
+	Type 2:
+		- Indicates the current frame time of the snapshot
+
+	Type 3:
+		- This packet is used when `\df_ghost1_RecordFileFormat 0`
+		- Only stores the player position and viewangles
+
+	Type 4:
+		- Used when `\df_ghost1_RecordFileFormat 1-3`
+		- Stores player position, viewangles, and animation related info...
+
+	Type 5:
+		- Stores the projectile data (type, position ...)
+
+	Type 6:
+		- Lets the game know where to play projectile destruction sequences
+
+	Type 7:
+		- It serves as a snapshot delimiter
+
+	Type 8:
+		- Used when `\df_ghost1_RecordFileFormat 3`
+		- It is used to keep track of changes to cvars in
+		  `defrag/system/Ghost-MonitoredVars.cfg`
+
+The format of each type of packet can be described by:
+
+	Type 2:
+		int frametime; // the frametime of the snapshot
+
+	Type 3:
+		float position[3]; // the position vector of player
+		float angles[3]; // the yaw/pitch/roll of player
+
+	Type 4:
+		float position[3]; // the position vector of player
+		float angles[3]; // the yaw/pitch/roll of player
+
+		qboolean crouching; // not sure if its just a boolean for crouch or more
+		qboolean noPositionLerp; // lets DeFRaG know whether to lerp positions or not
+
+		int weapon; // the currently selected weapon number
+		int torsoAnimationNumber, legsAnimationNumber; // anim nums of torso/legs
+
+		lerpFrame_t torso, legs; // refer to <cg_local.h> for lerpFrame_t struct
+
+	Type 5:
+		int entityNumber; // entity number of projectile
+		int weapon; // indicates projectile type (ie. missile, nade or ...)
+
+		float position[3]; // position of the projectile
+		float velocity[3]; // velocity of the projectile
+
+	Type 6:
+		float position[3]; // position to explode/destroy projectile
+		int weapon; // indicates projectile type (ie. missile, nade or ...)
+
+	Type 7:
+		- Serves as a snapshot delimiter
+
+	Type 8:
+		char cvar_name[64]; // name of the cvar
+		float value; // value of the cvar
+
+
+
+=== 010 editor binary template ===
+The following is a binary template for the 010 editor.
+
+typedef enum{qfalse, qtrue} qboolean;
+
+typedef struct {
+    int32            oldFrame;
+    int32            oldFrameTime;        // time when ->oldFrame was exactly on
+
+    int32            frame;
+    int32            frameTime;            // time when ->frame will be exactly on
+
+    float        backlerp;
+
+    float        yawAngle;
+    qboolean          yawing;
+    float        pitchAngle;
+    qboolean          pitching;
+
+    int32            animationNumber;    // may include ANIM_TOGGLEBIT
+    int32            animation;         // nope, its not an int but who cares
+    int32            animationTime;      // time when the first frame of the animation will be exact
+} lerpFrame_t;
+
+struct {
+    int32 magic;
+    int32 ghostVersion;
+    int32 serverVersion;
+    char mapname[16];
+} header;
+
+while(!FEof()) {
+    struct {
+        int32 packet_type;
+
+        if(packet_type == 2) {
+            int32 frameTime; // guess?
+        } else if(packet_type == 3) {
+            float position[3];
+            float angles[3];
+        } else if(packet_type == 4) {
+            float position[3];
+            float angles[3];
+
+            // no idea what type the rest of these should actually be
+            qboolean crouching; // maybe even more than just crouching?
+            qboolean noPositionLerp;
+            int32 weapon;
+            int32 torsoAnimationNumber, legsAnimationNumber;
+            lerpFrame_t torso, legs;
+        } else if(packet_type == 5) {
+            int32 entityID;
+            int32 weapon;
+            float origin[3];
+            float velocity[3];
+        } else if(packet_type == 6) {
+            float origin[3];
+            int32 weapon;
+        } else if(packet_type == 8) {
+            char cvar_name[64];
+            float value;
+        }
+    } packet <optimize=false>;
+}
+
+Note: It does not parse the packets into snapshots.

@@ -1,0 +1,61 @@
+typedef struct {
+    int32 oldFrame;
+    int32 oldFrameTime; // time when ->oldFrame was exactly on
+
+    int32 frame;
+    int32 frameTime;    // time when ->frame will be exactly on
+
+    float backlerp;
+
+    float yawAngle;
+    int32 yawing;
+    float pitchAngle;
+    int32 pitching;
+
+    int32 animationNumber; // may include ANIM_TOGGLEBIT
+    int32 animation;       // actually animation_t*
+    int32 animationTime;   // time when the first frame of the animation will be exact
+} lerpFrame_t <optimize=false>;
+
+struct {
+    uint32 magic;
+    uint32 version;
+    uint32 unknown;
+    char mapname[16];
+} header;
+
+while(!FEof()) {
+    if      ( ReadByte() == 2 ) SetBackColor( cLtRed );
+    else if ( ReadByte() == 4 ) SetBackColor( cLtGreen );
+    else if ( ReadByte() == 5 ) SetBackColor( cLtYellow );
+    else if ( ReadByte() == 6 ) SetBackColor( cLtBlue );
+    else if ( ReadByte() == 7 ) SetBackColor( cLtAqua );
+    else SetBackColor( cNone );
+    struct {
+        int32 packet_type;
+    
+        if(packet_type == 2) {
+            int32 frameTime; // guess?
+        } else if(packet_type == 4) {
+            float position[3];
+            float angles[3];
+
+            // no idea what type the rest of these should actually be
+            int32 ducking;
+            int32 unknown2;
+            int32 unknown3;
+            int32 animationNumber[2];
+            lerpFrame_t lerpFrames[2];
+        } else if(packet_type == 5) {
+            // shoot weapon?
+            int32 entityNum;
+            int32 weapon;
+            float origin[3];
+            float velocity[3];
+        } else if(packet_type == 6) {
+            // weapon hit?
+            float origin[3];
+            int32 weapon;
+        }
+    } packet <optimize=false>;
+}
