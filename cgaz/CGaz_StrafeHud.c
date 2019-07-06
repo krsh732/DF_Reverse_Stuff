@@ -10,7 +10,8 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
     var_78 = tan( DEG2RAD(cg.refdef.fov_x / 2.0f) );
     yaw = cg.predictedPlayerState.viewangles[1];
 
-    // if wasd or some drawing related var or something?
+    // 0x1b = 0x1 | 0x2 | 0x8 | 0x10 = KEY_FORWARD | KEY_BACK | KEY_LEFT | KEY_RIGHT
+    // global_11c954 = some drawing/model/graphics/hud related cvar or something?
     if ( (cg.predictedPlayerState.stats[13] & 0x1b) || !global_11c954 ) {
         yaw = yaw + 45.0 * cg.predictedPlayerState.movementDir;
     }
@@ -24,7 +25,7 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
     xyvel[1] = cg.predictedPlayerState.velocity[1];
     xyvel[2] = 0;
     speed = VectorLength(xyvel);
-    velocity_angle = RAD2DEG( atan2( cg.predictedPlayerState.velocity[1], cg.predictedPlayerState.velocity[0] ) );
+    velocity_angle = RAD2DEG( atan2( xyvel[1], xyvel[0] ) );
 
     accel = cg.snap->ps.speed * (pmove_msec.value / 1000.0f);
     if ( cg.predictedPlayerState.groundEntityNum != ENTITYNUM_NONE ) {
