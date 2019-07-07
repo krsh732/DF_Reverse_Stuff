@@ -506,10 +506,10 @@ static void PM_AirMove( void ) {
             }
             cpmairaccel = 70.0f;
         }
-        PM_Accelerate( wishdir, wishspeed, cpmairaccel )
-        PM_AirControl( pm, wishdir, wishspeed )
+        PM_Accelerate( wishdir, wishspeed, cpmairaccel );
+        PM_AirControl( pm, wishdir, wishspeed );
     } else {
-        PM_Accelerate( wishdir, wishspeed, pm_airaccelerate )
+        PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
     }
 
     // we may have a ground plane that is very steep, even
