@@ -7,8 +7,8 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
 
     blue[3] = opacity;
 
-    var_78 = tan( DEG2RAD(cg.refdef.fov_x / 2.0f) );
-    yaw = cg.predictedPlayerState.viewangles[1];
+    float var_78 = tan( DEG2RAD(cg.refdef.fov_x / 2.0f) );
+    float yaw = cg.predictedPlayerState.viewangles[1];
 
     // 0x1b = 0x1 | 0x2 | 0x8 | 0x10 = KEY_FORWARD | KEY_BACK | KEY_LEFT | KEY_RIGHT
     // global_11c954 = some drawing/model/graphics/hud related cvar or something?
@@ -24,13 +24,13 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
     xyvel[0] = cg.predictedPlayerState.velocity[0];
     xyvel[1] = cg.predictedPlayerState.velocity[1];
     xyvel[2] = 0;
-    speed = VectorLength(xyvel);
-    velocity_angle = RAD2DEG( atan2( xyvel[1], xyvel[0] ) );
+    float speed = VectorLength(xyvel);
+    float velocity_angle = RAD2DEG( atan2( xyvel[1], xyvel[0] ) );
 
-    accel = cg.snap->ps.speed * (pmove_msec.value / 1000.0f);
+    float accel = cg.snap->ps.speed * (pmove_msec.value / 1000.0f);
     if ( cg.predictedPlayerState.groundEntityNum != ENTITYNUM_NONE ) {
         accel = 10.0f * accel; // hard coded for vq3
-        speed = speed * (1.0f - (6.0f * (pmove_msec.value / 1000.0f))) // friction
+        speed = speed * (1.0f - (6.0f * (pmove_msec.value / 1000.0f))); // friction
     }
 
     if ( speed <= cg.snap->ps.speed - accel ) {
@@ -46,7 +46,7 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
         { 0.0,  1.0,  0.0,  1.0 }, // green
         { 0.0,  0.25, 0.25, 1.0 }, // cyan
         { 1.0,  1.0,  0.0,  1.0 }  // yellow
-    }
+    };
 
     colors[0][3] *= opacity;
     colors[1][3] *= opacity;
@@ -57,14 +57,15 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
     colors[6][3] *= opacity;
     colors[7][3] *= opacity;
 
-    var_1ac = RAD2DEG( acos( (-0.5f * accel) / speed ) );
-    opt_angle = RAD2DEG( acos( (cg.snap->ps.speed - accel) / speed ) );
+    float var_1ac = RAD2DEG( acos( (-0.5f * accel) / speed ) );
+    float opt_angle = RAD2DEG( acos( (cg.snap->ps.speed - accel) / speed ) );
 
-    min_angle = 0;
+    float min_angle = 0;
     if ( speed > cg.snap->ps.speed ) {
         min_angle = RAD2DEG( acos( cg.snap->ps.speed / speed ) );
     }
 
+    float angles[9];
     angles[0] = velocity_angle - var_1ac;
     angles[1] = velocity_angle - 90.0f;
     angles[2] = velocity_angle - opt_angle;
@@ -75,9 +76,9 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
     angles[7] = velocity_angle + 90.0f;
     angles[8] = velocity_angle + var_1ac;
 
-    for(i = 0; i < 8; i++) {
-        angle_a = AngleSubtract( yaw, angles[i] );
-        angle_b = AngleSubtract( yaw, angles[i+1] );
+    for(int i = 0; i < 8; i++) {
+        float angle_a = AngleSubtract( yaw, angles[i] );
+        float angle_b = AngleSubtract( yaw, angles[i+1] );
 
         // clip
         if ( fabs( angle_a ) > (cg.refdef.fov_x / 2.0f) ) {
@@ -89,8 +90,8 @@ void CGaz_StrafeHud_Draw(float opacity, int ypos) {
             angle_b = (cg.refdef.fov_x / 2.0f) * (angle_b < 0.0f ? -1.0f : 1.0f);
         }
 
-        x_a = (320.0f * tan( DEG2RAD(angle_a) )) / var_78;
-        x_b = (320.0f * tan( DEG2RAD(angle_b) )) / var_78;
+        float x_a = (320.0f * tan( DEG2RAD(angle_a) )) / var_78;
+        float x_b = (320.0f * tan( DEG2RAD(angle_b) )) / var_78;
         if ( x_a >= x_b ) {
             CG_FillRect( x_b + 320.0f, ypos, x_a - x_b, 16.0f, colors[i] );
             if ( i == 4 ) {
