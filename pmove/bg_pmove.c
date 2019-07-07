@@ -401,3 +401,124 @@ static void PM_WaterMove( void ) {
 
     PM_SlideMove( qfalse );
 }
+
+static void PM_FlyMove( void ) {
+    int     i;
+    vec3_t  wishvel;
+    float   wishspeed;
+    vec3_t  wishdir;
+    float   scale;
+
+    // normal slowdown
+    PM_Friction ();
+
+    scale = PM_CmdScale( &pm->cmd );
+    //
+    // user intentions
+    //
+    if ( !scale ) {
+        wishvel[0] = 0;
+        wishvel[1] = 0;
+        wishvel[2] = 0;
+    } else {
+        for (i=0 ; i<3 ; i++) {
+            wishvel[i] = scale * pml.forward[i]*pm->cmd.forwardmove + scale * pml.right[i]*pm->cmd.rightmove;
+        }
+
+        wishvel[2] += scale * pm->cmd.upmove;
+    }
+
+    VectorCopy (wishvel, wishdir);
+    wishspeed = VectorNormalize(wishdir);
+
+    PM_Accelerate (wishdir, wishspeed, pm_flyaccelerate);
+
+    PM_StepSlideMove( qfalse );
+}
+
+static void PM_AirControl(pmove_t *pm, vec3_t wishdir, float wishspeed) {
+    float zspeed, speed, dot, k;
+
+    if ( (pm->ps->movementDir && pm->ps->movementDir != 4) || wishspeed == 0.0 ) {
+        return;
+    }
+
+    zspeed = pm->ps->velocity[2];
+    pm->ps->velocity[2] = 0;
+    speed = VectorNormalize( pm->ps->velocity );
+    dot = DotProduct( pm->ps->velocity, wishdir );
+    if ( dot > 0 ) {
+        k = 32*150*dot*dot*pml.frametime;
+        pm->ps->velocity[0] = pm->ps->velocity[0]*speed + wishdir[0]*k;
+        pm->ps->velocity[1] = pm->ps->velocity[1]*speed + wishdir[1]*k;
+        VectorNormalize( pm->ps->velocity );
+    }
+
+    pm->ps->velocity[0] *= speed;
+    pm->ps->velocity[1] *= speed;
+    pm->ps->velocity[2] = zspeed
+}
+
+static void PM_AirMove( void ) {
+    int         i;
+    vec3_t      wishvel;
+    float       fmove, smove;
+    vec3_t      wishdir;
+    float       wishspeed;
+    float       scale;
+    usercmd_t   cmd;
+    float       cpmairaccel;
+
+    PM_Friction();
+
+    fmove = pm->cmd.forwardmove;
+    smove = pm->cmd.rightmove;
+
+    cmd = pm->cmd;
+    scale = PM_CmdScale( &cmd );
+
+    // set the movementDir so clients can rotate the legs for strafing
+    PM_SetMovementDir();
+
+    // project moves down to flat plane
+    pml.forward[2] = 0;
+    pml.right[2] = 0;
+    VectorNormalize (pml.forward);
+    VectorNormalize (pml.right);
+
+    for ( i = 0 ; i < 2 ; i++ ) {
+        wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
+    }
+    wishvel[2] = 0;
+
+    VectorCopy (wishvel, wishdir);
+    wishspeed = VectorNormalize(wishdir);
+    wishspeed *= scale;
+
+    if ( (pm->ps->pm_flags & PMF_PROMODE) ) {
+        cpmairaccel = pm_airaccelerate;
+        if ( DotProduct(pm->ps->velocity, wishdir) < 0 ) {
+            cpmairaccel = 2.5f;
+        }
+        if ( pm->ps->movementDir == 2 || pm->ps->movementDir == 6 ) {
+            if ( wishspeed > 30.0f ) {
+                wishspeed = 30.0f;
+            }
+            cpmairaccel = 70.0f;
+        }
+        PM_Accelerate( wishdir, wishspeed, cpmairaccel )
+        PM_AirControl( pm, wishdir, wishspeed )
+    } else {
+        PM_Accelerate( wishdir, wishspeed, pm_airaccelerate )
+    }
+
+    // we may have a ground plane that is very steep, even
+    // though we don't have a groundentity
+    // slide along the steep plane
+    if ( pml.groundPlane ) {
+        PM_ClipVelocity (pm->ps->velocity, pml.groundTrace.plane.normal,
+            pm->ps->velocity, OVERCLIP );
+    }
+
+    PM_StepSlideMove ( qtrue );
+}
