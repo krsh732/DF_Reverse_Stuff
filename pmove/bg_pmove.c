@@ -456,7 +456,7 @@ static void PM_AirControl(pmove_t *pm, vec3_t wishdir, float wishspeed) {
 
     pm->ps->velocity[0] *= speed;
     pm->ps->velocity[1] *= speed;
-    pm->ps->velocity[2] = zspeed
+    pm->ps->velocity[2] = zspeed;
 }
 
 static void PM_AirMove( void ) {
