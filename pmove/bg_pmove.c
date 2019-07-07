@@ -1,4 +1,6 @@
 #define PMF_PROMODE 0x8000
+// needs to be moved to statIndex_t one day
+#define STAT_JUMPTIME 10
 
 void PM_AddEvent( int newEvent ) {
 	BG_AddPredictableEventToPlayerstate( newEvent, 0, pm->ps );
@@ -151,4 +153,128 @@ static void PM_Friction( void ) {
 	vel[0] = vel[0] * newspeed;
 	vel[1] = vel[1] * newspeed;
 	vel[2] = vel[2] * newspeed;
+}
+
+static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
+	// q2 style
+	int			i;
+	float		addspeed, accelspeed, currentspeed;
+
+	currentspeed = DotProduct (pm->ps->velocity, wishdir);
+	addspeed = wishspeed - currentspeed;
+	if (addspeed <= 0) {
+		return;
+	}
+	accelspeed = accel*pml.frametime*wishspeed;
+	if (accelspeed > addspeed) {
+		accelspeed = addspeed;
+	}
+
+	for (i=0 ; i<3 ; i++) {
+		pm->ps->velocity[i] += accelspeed*wishdir[i];
+	}
+}
+
+static float PM_CmdScale( usercmd_t *cmd ) {
+	int		max;
+	float	total;
+	float	scale;
+
+	max = abs( cmd->forwardmove );
+	if ( abs( cmd->rightmove ) > max ) {
+		max = abs( cmd->rightmove );
+	}
+	if ( abs( cmd->upmove ) > max ) {
+		max = abs( cmd->upmove );
+	}
+	if ( !max ) {
+		return 0;
+	}
+
+	total = sqrt( cmd->forwardmove * cmd->forwardmove
+		+ cmd->rightmove * cmd->rightmove + cmd->upmove * cmd->upmove );
+	scale = (float)pm->ps->speed * max / ( 127.0 * total );
+
+	return scale;
+}
+
+static void PM_SetMovementDir( void ) {
+	if ( pm->cmd.forwardmove || pm->cmd.rightmove ) {
+		if ( pm->cmd.rightmove == 0 && pm->cmd.forwardmove > 0 ) {
+			pm->ps->movementDir = 0;
+		} else if ( pm->cmd.rightmove < 0 && pm->cmd.forwardmove > 0 ) {
+			pm->ps->movementDir = 1;
+		} else if ( pm->cmd.rightmove < 0 && pm->cmd.forwardmove == 0 ) {
+			pm->ps->movementDir = 2;
+		} else if ( pm->cmd.rightmove < 0 && pm->cmd.forwardmove < 0 ) {
+			pm->ps->movementDir = 3;
+		} else if ( pm->cmd.rightmove == 0 && pm->cmd.forwardmove < 0 ) {
+			pm->ps->movementDir = 4;
+		} else if ( pm->cmd.rightmove > 0 && pm->cmd.forwardmove < 0 ) {
+			pm->ps->movementDir = 5;
+		} else if ( pm->cmd.rightmove > 0 && pm->cmd.forwardmove == 0 ) {
+			pm->ps->movementDir = 6;
+		} else if ( pm->cmd.rightmove > 0 && pm->cmd.forwardmove > 0 ) {
+			pm->ps->movementDir = 7;
+		}
+	} else {
+		// if they aren't actively going directly sideways,
+		// change the animation to the diagonal so they
+		// don't stop too crooked
+		if ( pm->ps->movementDir == 2 ) {
+			pm->ps->movementDir = 1;
+		} else if ( pm->ps->movementDir == 6 ) {
+			pm->ps->movementDir = 7;
+		}
+	}
+}
+
+static qboolean PM_CheckJump( void ) {
+    if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
+        return qfalse;      // don't allow jump until all buttons are up
+    }
+
+    if ( pm->cmd.upmove < 10 ) {
+        // not holding jump
+        return qfalse;
+    }
+
+    // must wait for jump to be released
+    if ( pm->ps->pm_flags & PMF_JUMP_HELD ) {
+        // clear upmove so cmdscale doesn't lower running speed
+        pm->cmd.upmove = 0;
+        return qfalse;
+    }
+
+    pml.groundPlane = qfalse;       // jumping away
+    pml.walking = qfalse;
+    pm->ps->pm_flags |= PMF_JUMP_HELD;
+    pm->ps->groundEntityNum = ENTITYNUM_NONE;
+
+    if ( pm->ps->velocity[2] <= 0 || !(pm->ps->pm_flags & PMF_PROMODE)) {
+        pm->ps->velocity[2] = JUMP_VELOCITY;
+    } else {
+        pm->ps->velocity[2] += JUMP_VELOCITY;
+    }
+
+    if ( pm->ps->pm_flags & PMF_PROMODE ) {
+        if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
+            pm->ps->velocity[2] += 100.0f;
+            // what do I call this?
+            pm->ps->stats[STAT_JUMPTIME + 1] = 1;
+        }
+        pm->ps->stats[STAT_JUMPTIME] = 400
+    }
+
+    PM_AddEvent( EV_JUMP );
+
+    if ( pm->cmd.forwardmove >= 0 ) {
+        PM_ForceLegsAnim( LEGS_JUMP )
+        pm->ps->pm_flags &= ~PMF_BACKWARDS_JUMP;
+    } else {
+        PM_ForceLegsAnim( LEGS_JUMPB )
+        pm->ps->pm_flags |= PMF_BACKWARDS_JUMP;
+    }
+
+    return qtrue;
 }
