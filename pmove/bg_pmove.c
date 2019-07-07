@@ -464,7 +464,7 @@ static void PM_AirMove( void ) {
     vec3_t      wishvel;
     float       fmove, smove;
     vec3_t      wishdir;
-    float       wishspeed;
+    float       wishspeed, wishspeed2;
     float       scale;
     usercmd_t   cmd;
     float       cpmairaccel;
@@ -496,6 +496,7 @@ static void PM_AirMove( void ) {
     wishspeed *= scale;
 
     if ( (pm->ps->pm_flags & PMF_PROMODE) ) {
+        wishspeed2 = wishspeed;
         cpmairaccel = pm_airaccelerate;
         if ( DotProduct(pm->ps->velocity, wishdir) < 0 ) {
             cpmairaccel = 2.5f;
@@ -507,7 +508,7 @@ static void PM_AirMove( void ) {
             cpmairaccel = 70.0f;
         }
         PM_Accelerate( wishdir, wishspeed, cpmairaccel );
-        PM_AirControl( pm, wishdir, wishspeed );
+        PM_AirControl( pm, wishdir, wishspeed2 );
     } else {
         PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
     }
