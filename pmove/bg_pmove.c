@@ -523,3 +523,32 @@ static void PM_AirMove( void ) {
 
     PM_StepSlideMove ( qtrue );
 }
+
+static void PM_GrappleMove( void ) {
+    vec3_t vel, v;
+    float vlen;
+
+    VectorScale(pml.forward, -16, v);
+    VectorAdd(pm->ps->grapplePoint, v, v);
+    VectorSubtract(v, pm->ps->origin, vel);
+    vlen = VectorLength(vel);
+    VectorNormalize( vel );
+
+    if (vlen <= 100)
+        VectorScale(vel, 10 * vlen, vel);
+    else
+        VectorScale(vel, 800, vel);
+
+    VectorCopy(vel, pm->ps->velocity);
+
+    pml.groundPlane = qfalse;
+}
+
+// what to call this?
+static float sub_00006ea3( void ) {
+    float hook_speed = 800; // guess?
+    if ( pm->ps->powerups[PW_HASTE] ) {
+        hook_speed *= 1.3;
+    }
+    return hook_speed;
+}
