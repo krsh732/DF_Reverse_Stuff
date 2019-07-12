@@ -11,7 +11,7 @@ typedef struct {
     int         ignoreBitmap[2];    // MAX_CLIENTS = 64, so 2 ints needed
 } clientSession_t;
 
-typedef enum {VOTE_ABSTAIN, VOTE_YES, VOTE_NO} voteState_t
+typedef enum {VOTE_ABSTAIN, VOTE_YES, VOTE_NO} voteState_t;
 
 typedef struct {
     clientConnected_t   connected;
