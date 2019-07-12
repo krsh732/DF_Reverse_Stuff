@@ -1,0 +1,3 @@
+timeInfo_t[MAX_CLIENTS] qagame array:
+	.24: 0x12caa0
+	.25: 0x12cb60
