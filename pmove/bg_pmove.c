@@ -261,7 +261,6 @@ static qboolean PM_CheckJump( void ) {
     if ( pm->ps->pm_flags & PMF_PROMODE ) {
         if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
             pm->ps->velocity[2] += 100.0f;
-            // what do I call this?
             pm->ps->stats[STAT_DJING] = 1;
         }
         pm->ps->stats[STAT_JUMPTIME] = 400
