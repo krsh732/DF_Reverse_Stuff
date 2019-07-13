@@ -552,3 +552,136 @@ static float sub_00006ea3( void ) {
     }
     return hook_speed;
 }
+
+// TODO: sub_00006eba
+
+// TODO: sub_00006f8b
+
+// TODO: sub_00007017
+
+// TODO: sub_00007078
+
+static void PM_WalkMove( void ) {
+    int         i;
+    vec3_t      wishvel;
+    float       fmove, smove;
+    vec3_t      wishdir;
+    float       wishspeed;
+    float       scale;
+    usercmd_t   cmd;
+    float       accelerate;
+    float       vel;
+
+    if ( pm->waterlevel > 2 && DotProduct( pml.forward, pml.groundTrace.plane.normal ) > 0 ) {
+        // begin swimming
+        PM_WaterMove();
+        return;
+    }
+
+    if ( PM_CheckJump () ) {
+        // jumped away
+        if ( pm->waterlevel > 1 ) {
+            PM_WaterMove();
+        } else {
+            PM_AirMove();
+        }
+        return;
+    }
+
+
+    PM_Friction();
+
+    fmove = pm->cmd.forwardmove;
+    smove = pm->cmd.rightmove;
+
+    cmd = pm->cmd;
+    scale = PM_CmdScale( &cmd );
+
+    // set the movementDir so clients can rotate the legs for strafing
+    PM_SetMovementDir();
+
+    // project moves down to flat plane
+    pml.forward[2] = 0;
+    pml.right[2] = 0;
+
+    // project the forward and right directions onto the ground plane
+    PM_ClipVelocity (pml.forward, pml.groundTrace.plane.normal, pml.forward, OVERCLIP );
+    PM_ClipVelocity (pml.right, pml.groundTrace.plane.normal, pml.right, OVERCLIP );
+    //
+    VectorNormalize (pml.forward);
+    VectorNormalize (pml.right);
+
+    for ( i = 0 ; i < 3 ; i++ ) {
+        wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
+    }
+
+    VectorCopy (wishvel, wishdir);
+    wishspeed = VectorNormalize(wishdir);
+    wishspeed *= scale;
+
+    if ( pm->ps->pm_flags & PMF_DUCKED ) {
+        if ( wishspeed > pm->ps->speed * pm_duckScale ) {
+            wishspeed = pm->ps->speed * pm_duckScale;
+        }
+    }
+
+    if ( pm->waterlevel ) {
+        float waterScale;
+
+        if ( pm->ps->pm_flags & PMF_PROMODE ) {
+            float cpm_swimScale;
+
+            waterScale = pm->waterlevel / 3.0;
+            if ( pm->waterlevel == 1 ) {
+                cpm_swimScale = 0.585;
+            } else {
+                cpm_swimScale = 0.54;
+            }
+            waterScale = 1.0 - (1.0 - cpm_swimScale) * waterScale;
+            if ( wishspeed > pm->ps->speed * waterScale ) {
+                wishspeed = pm->ps->speed * waterScale;
+            }
+        } else {
+            waterScale = pm->waterlevel / 3.0;
+            waterScale = 1.0 - (1.0 - pm_swimScale) * waterScale;
+            if ( wishspeed > pm->ps->speed * waterScale ) {
+                wishspeed = pm->ps->speed * waterScale;
+            }
+        }
+    }
+
+    if ( pm->ps->pm_flags & PMF_PROMODE ) {
+        accelerate = 15.0;
+    } else {
+        // when a player gets hit, they temporarily lose
+        // full control, which allows them to be moved a bit
+        if ( (pml.groundTrace.surfaceFlags & SURF_SLICK) || pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) {
+            accelerate = pm_airaccelerate;
+        } else {
+            accelerate = pm_accelerate;
+        }
+    }
+
+    PM_Accelerate( wishdir, wishspeed, accelerate );
+
+    if ( (pml.groundTrace.surfaceFlags & SURF_SLICK) || pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) {
+        pm->ps->velocity[2] -= pm->ps->gravity * pml.frametime;
+    }
+
+    vel = VectorLength(pm->ps->velocity);
+
+    // slide along the ground plane
+    PM_ClipVelocity (pm->ps->velocity, pml.groundTrace.plane.normal,
+        pm->ps->velocity, OVERCLIP );
+
+    // don't decrease velocity when going up or down a slope
+    VectorNormalize(pm->ps->velocity);
+    VectorScale(pm->ps->velocity, vel, pm->ps->velocity);
+
+    // don't do anything if standing still
+    if (!pm->ps->velocity[0] && !pm->ps->velocity[1]) {
+        return;
+    }
+
+    PM_StepSlideMove( qfalse );
+}
