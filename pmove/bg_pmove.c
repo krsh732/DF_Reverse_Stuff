@@ -1,6 +1,7 @@
 #define PMF_PROMODE 0x8000
 // needs to be moved to statIndex_t one day
 #define STAT_JUMPTIME 10
+#define STAT_DJING 11
 
 void PM_AddEvent( int newEvent ) {
     BG_AddPredictableEventToPlayerstate( newEvent, 0, pm->ps );
@@ -261,7 +262,7 @@ static qboolean PM_CheckJump( void ) {
         if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
             pm->ps->velocity[2] += 100.0f;
             // what do I call this?
-            pm->ps->stats[STAT_JUMPTIME + 1] = 1;
+            pm->ps->stats[STAT_DJING] = 1;
         }
         pm->ps->stats[STAT_JUMPTIME] = 400
     }
