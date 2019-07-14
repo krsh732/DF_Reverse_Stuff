@@ -4,7 +4,7 @@ def shl32(x, n):
 def shr32(x, n):
     return (x & 0xffffffff) >> n
 
-def get_time(ps, snap_serverTime):
+def get_time(ps, snap_serverTime, mapname):
     time = shl32(ps.stats[7], 0x10) | (ps.stats[8] & 0xffff)
 
     if time == 0:
@@ -26,7 +26,7 @@ def get_time(ps, snap_serverTime):
 
     local1c = shl32(snap_serverTime, 2)
     df_ver = 19124
-    map_type = 24 # global_11cdc8, not sure why i called this map_type
+    map_type = sum(map(ord, mapname.lower())) & 0xff
     local1c += shl32(df_ver + map_type, 8)
     local1c ^= shl32(snap_serverTime, 0x18)
     time ^= local1c
