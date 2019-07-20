@@ -598,7 +598,21 @@ static void PM_SwingingGrappleMove( void ) {
     pml.groundPlane = qfalse;
 }
 
-// TODO: sub_00007017
+static void PM_PendulumGrappleMove( void ) {
+    // TODO: better name? it isn't normalized, so maybe dir isn't quite right
+    vec3_t hook_dir;
+
+    VectorSubtract( pm->ps->grapplePoint, pm->ps->origin, hook_dir );
+    PM_Accelerate( hook_dir, 1.0, 5.0 );
+
+    if ( hook_dir[2] > 0.5f && pml.walking ) {
+        pml.walking = qfalse;
+        PM_ForceLegsAnim( LEGS_JUMP );
+    }
+
+    pml.groundPlane = qfalse;
+}
+
 
 // TODO: sub_00007078
 
