@@ -574,7 +574,29 @@ static void PM_Q2GrappleMove( void ) {
     pml.groundPlane = qfalse;
 }
 
-// TODO: sub_00006f8b
+// TODO: name the vars properly
+static void PM_SwingingGrappleMove( void ) {
+    vec3_t var_14;
+    float var_20, var_24;
+
+    var_24 = PM_HookSpeed();
+    VectorSubtract(pm->ps->grapplePoint, pm->ps->origin, var_14);
+    var_20 = VectorLength( var_14 );
+    VectorNormalize( var_14 );
+
+    if ( var_20 < (var_24 / 2.0) ) {
+        PM_Accelerate( var_14, (2.0 * var_20), (var_20 * (40.0 / var_24)) );
+    } else {
+        PM_Accelerate( var_14, var_24, 20.0 );
+    }
+
+    if ( var_14[2] > 0.5f && pml.walking ) {
+        pml.walking = qfalse;
+        PM_ForceLegsAnim( LEGS_JUMP );
+    }
+
+    pml.groundPlane = qfalse;
+}
 
 // TODO: sub_00007017
 
