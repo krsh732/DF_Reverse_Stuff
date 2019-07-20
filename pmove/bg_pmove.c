@@ -1401,3 +1401,283 @@ static void PM_FinishWeaponChange( void ) {
 
     PM_StartTorsoAnim( TORSO_RAISE );
 }
+
+static void PM_TorsoAnimation( void ) {
+    if ( pm->ps->weaponstate == WEAPON_READY ) {
+        if ( pm->ps->weapon == WP_GAUNTLET ) {
+            PM_ContinueTorsoAnim( TORSO_STAND2 );
+        } else {
+            PM_ContinueTorsoAnim( TORSO_STAND );
+        }
+        return;
+    }
+}
+
+static void PM_Weapon( void ) {
+    int     addTime;
+
+    // don't allow attack until all buttons are up
+    if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
+        return;
+    }
+
+    // ignore if spectator
+    if ( pm->ps->persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+        return;
+    }
+
+    // check for dead player
+    if ( pm->ps->stats[STAT_HEALTH] <= 0 ) {
+        pm->ps->weapon = WP_NONE;
+        return;
+    }
+
+    // check for item using
+    if ( pm->cmd.buttons & BUTTON_USE_HOLDABLE ) {
+        if ( ! ( pm->ps->pm_flags & PMF_USE_ITEM_HELD ) ) {
+            if ( bg_itemlist[pm->ps->stats[STAT_HOLDABLE_ITEM]].giTag == HI_MEDKIT
+                && pm->ps->stats[STAT_HEALTH] >= (pm->ps->stats[STAT_MAX_HEALTH] + 25) ) {
+                // don't use medkit if at max health
+            } else {
+                pm->ps->pm_flags |= PMF_USE_ITEM_HELD;
+                PM_AddEvent( EV_USE_ITEM0 + bg_itemlist[pm->ps->stats[STAT_HOLDABLE_ITEM]].giTag );
+                pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
+            }
+            return;
+        }
+    } else {
+        pm->ps->pm_flags &= ~PMF_USE_ITEM_HELD;
+    }
+
+
+    // make weapon function
+    if ( pm->ps->weaponTime > 0 ) {
+        pm->ps->weaponTime -= pml.msec;
+    }
+
+    // check for weapon change
+    // can't change if weapon is firing, but can change
+    // again if lowering or raising
+    if ( pm->ps->weaponTime <= 0 || pm->ps->weaponstate != WEAPON_FIRING ) {
+        if ( pm->ps->weapon != pm->cmd.weapon ) {
+            PM_BeginWeaponChange( pm->cmd.weapon );
+        }
+    }
+
+    if ( pm->ps->weaponTime > 0 ) {
+        return;
+    }
+
+    // change weapon if time
+    if ( pm->ps->weaponstate == WEAPON_DROPPING ) {
+        PM_FinishWeaponChange();
+        return;
+    }
+
+    if ( pm->ps->weaponstate == WEAPON_RAISING ) {
+        pm->ps->weaponstate = WEAPON_READY;
+        if ( pm->ps->weapon == WP_GAUNTLET ) {
+            PM_StartTorsoAnim( TORSO_STAND2 );
+        } else {
+            PM_StartTorsoAnim( TORSO_STAND );
+        }
+        return;
+    }
+
+    // check for fire
+    if ( ! (pm->cmd.buttons & BUTTON_ATTACK) ) {
+        pm->ps->weaponTime = 0;
+        pm->ps->weaponstate = WEAPON_READY;
+        return;
+    }
+
+    // start the animation even if out of ammo
+    if ( pm->ps->weapon == WP_GAUNTLET ) {
+        // the guantlet only "fires" when it actually hits something
+        if ( !pm->gauntletHit ) {
+            pm->ps->weaponTime = 0;
+            pm->ps->weaponstate = WEAPON_READY;
+            return;
+        }
+        PM_StartTorsoAnim( TORSO_ATTACK2 );
+    } else {
+        PM_StartTorsoAnim( TORSO_ATTACK );
+    }
+
+    pm->ps->weaponstate = WEAPON_FIRING;
+
+    // check for out of ammo
+    if ( ! pm->ps->ammo[ pm->ps->weapon ] ) {
+        PM_AddEvent( EV_NOAMMO );
+        pm->ps->weaponTime += 500;
+        return;
+    }
+
+    // take an ammo away if not infinite
+    if ( pm->ps->ammo[ pm->ps->weapon ] != -1 ) {
+        pm->ps->ammo[ pm->ps->weapon ]--;
+    }
+
+    // fire weapon
+    PM_AddEvent( EV_FIRE_WEAPON );
+
+    switch( pm->ps->weapon ) {
+    default:
+    case WP_GAUNTLET:
+        addTime = 400;
+        break;
+    case WP_LIGHTNING:
+        addTime = 50;
+        break;
+    case WP_SHOTGUN:
+        addTime = 1000;
+        break;
+    case WP_MACHINEGUN:
+        addTime = 100;
+        break;
+    case WP_GRENADE_LAUNCHER:
+        addTime = 800;
+        break;
+    case WP_ROCKET_LAUNCHER:
+        addTime = 800;
+        break;
+    case WP_PLASMAGUN:
+        addTime = 100;
+        break;
+    case WP_RAILGUN:
+        addTime = 1500;
+        break;
+    case WP_BFG:
+        addTime = 200;
+        break;
+    case WP_GRAPPLING_HOOK:
+        addTime = 400;
+        break;
+#ifdef MISSIONPACK
+    case WP_NAILGUN:
+        addTime = 1000;
+        break;
+    case WP_PROX_LAUNCHER:
+        addTime = 800;
+        break;
+    case WP_CHAINGUN:
+        addTime = 30;
+        break;
+#endif
+    }
+
+#ifdef MISSIONPACK
+    if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
+        addTime /= 1.5;
+    }
+    else
+    if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
+        addTime /= 1.3;
+  }
+  else
+#endif
+    if ( pm->ps->powerups[PW_HASTE] ) {
+        addTime /= 1.3;
+    }
+
+    pm->ps->weaponTime += addTime;
+}
+
+static void PM_Animate( void ) {
+    if ( pm->cmd.buttons & BUTTON_GESTURE ) {
+        if ( pm->ps->torsoTimer == 0 ) {
+            PM_StartTorsoAnim( TORSO_GESTURE );
+            pm->ps->torsoTimer = TIMER_GESTURE;
+            PM_AddEvent( EV_TAUNT );
+        }
+#ifdef MISSIONPACK
+    } else if ( pm->cmd.buttons & BUTTON_GETFLAG ) {
+        if ( pm->ps->torsoTimer == 0 ) {
+            PM_StartTorsoAnim( TORSO_GETFLAG );
+            pm->ps->torsoTimer = 600;   //TIMER_GESTURE;
+        }
+    } else if ( pm->cmd.buttons & BUTTON_GUARDBASE ) {
+        if ( pm->ps->torsoTimer == 0 ) {
+            PM_StartTorsoAnim( TORSO_GUARDBASE );
+            pm->ps->torsoTimer = 600;   //TIMER_GESTURE;
+        }
+    } else if ( pm->cmd.buttons & BUTTON_PATROL ) {
+        if ( pm->ps->torsoTimer == 0 ) {
+            PM_StartTorsoAnim( TORSO_PATROL );
+            pm->ps->torsoTimer = 600;   //TIMER_GESTURE;
+        }
+    } else if ( pm->cmd.buttons & BUTTON_FOLLOWME ) {
+        if ( pm->ps->torsoTimer == 0 ) {
+            PM_StartTorsoAnim( TORSO_FOLLOWME );
+            pm->ps->torsoTimer = 600;   //TIMER_GESTURE;
+        }
+    } else if ( pm->cmd.buttons & BUTTON_AFFIRMATIVE ) {
+        if ( pm->ps->torsoTimer == 0 ) {
+            PM_StartTorsoAnim( TORSO_AFFIRMATIVE);
+            pm->ps->torsoTimer = 600;   //TIMER_GESTURE;
+        }
+    } else if ( pm->cmd.buttons & BUTTON_NEGATIVE ) {
+        if ( pm->ps->torsoTimer == 0 ) {
+            PM_StartTorsoAnim( TORSO_NEGATIVE );
+            pm->ps->torsoTimer = 600;   //TIMER_GESTURE;
+        }
+#endif
+    }
+}
+
+static void PM_DropTimers( void ) {
+    // drop misc timing counter
+    if ( pm->ps->pm_time ) {
+        if ( pml.msec >= pm->ps->pm_time ) {
+            pm->ps->pm_flags &= ~PMF_ALL_TIMES;
+            pm->ps->pm_time = 0;
+        } else {
+            pm->ps->pm_time -= pml.msec;
+        }
+    }
+
+    // drop animation counter
+    if ( pm->ps->legsTimer > 0 ) {
+        pm->ps->legsTimer -= pml.msec;
+        if ( pm->ps->legsTimer < 0 ) {
+            pm->ps->legsTimer = 0;
+        }
+    }
+
+    if ( pm->ps->torsoTimer > 0 ) {
+        pm->ps->torsoTimer -= pml.msec;
+        if ( pm->ps->torsoTimer < 0 ) {
+            pm->ps->torsoTimer = 0;
+        }
+    }
+}
+
+void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
+    short       temp;
+    int     i;
+
+    if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPINTERMISSION) {
+        return;     // no view changes at all
+    }
+
+    if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 ) {
+        return;     // no view changes at all
+    }
+
+    // circularly clamp the angles with deltas
+    for (i=0 ; i<3 ; i++) {
+        temp = cmd->angles[i] + ps->delta_angles[i];
+        if ( i == PITCH ) {
+            // don't let the player look up or down more than 90 degrees
+            if ( temp > 16000 ) {
+                ps->delta_angles[i] = 16000 - cmd->angles[i];
+                temp = 16000;
+            } else if ( temp < -16000 ) {
+                ps->delta_angles[i] = -16000 - cmd->angles[i];
+                temp = -16000;
+            }
+        }
+        ps->viewangles[i] = SHORT2ANGLE(temp);
+    }
+
+}
