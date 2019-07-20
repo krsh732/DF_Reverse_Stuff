@@ -1364,12 +1364,40 @@ static void PM_BeginWeaponChange( int weapon ) {
 
     PM_AddEvent( EV_CHANGE_WEAPON );
     pm->ps->weaponstate = WEAPON_DROPPING;
-    if( pm->ps->pm_flags & PMF_PROMODE ) {
+
+    if ( pm->ps->pm_flags & PMF_PROMODE ) {
         // did someone really write this?
         // maybe the if-else is supposed to be ternary?
         pm->ps->weaponTime = pm->ps->weaponTime;
     } else {
         pm->ps->weaponTime += 200;
     }
+
     PM_StartTorsoAnim( TORSO_DROP );
+}
+
+static void PM_FinishWeaponChange( void ) {
+    int     weapon;
+
+    weapon = pm->cmd.weapon;
+    if ( weapon < WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+        weapon = WP_NONE;
+    }
+
+    if ( !( pm->ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
+        weapon = WP_NONE;
+    }
+
+    pm->ps->weapon = weapon;
+    pm->ps->weaponstate = WEAPON_RAISING;
+
+    if ( pm->ps->pm_flags & PMF_PROMODE ) {
+        // did someone really write this?
+        // maybe the if-else is supposed to be ternary?
+        pm->ps->weaponTime = pm->ps->weaponTime;
+    } else {
+        pm->ps->weaponTime += 250;
+    }
+
+    PM_StartTorsoAnim( TORSO_RAISE );
 }
