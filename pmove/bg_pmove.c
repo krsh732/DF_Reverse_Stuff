@@ -263,7 +263,7 @@ static qboolean PM_CheckJump( void ) {
             pm->ps->velocity[2] += 100.0f;
             pm->ps->stats[STAT_DJING] = 1;
         }
-        pm->ps->stats[STAT_JUMPTIME] = 400
+        pm->ps->stats[STAT_JUMPTIME] = 400;
     }
 
     PM_AddEvent( EV_JUMP );
