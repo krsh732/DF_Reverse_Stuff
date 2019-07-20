@@ -1110,3 +1110,237 @@ static void PM_GroundTrace( void ) {
 
     PM_AddTouchEnt( trace.entityNum );
 }
+
+static void PM_SetWaterLevel( void ) {
+    vec3_t      point;
+    int         cont;
+    int         sample1;
+    int         sample2;
+
+    //
+    // get waterlevel, accounting for ducking
+    //
+    pm->waterlevel = 0;
+    pm->watertype = 0;
+
+    point[0] = pm->ps->origin[0];
+    point[1] = pm->ps->origin[1];
+    point[2] = pm->ps->origin[2] + MINS_Z + 1;
+    cont = pm->pointcontents( point, pm->ps->clientNum );
+
+    if ( cont & MASK_WATER ) {
+        sample2 = pm->ps->viewheight - MINS_Z;
+        sample1 = sample2 / 2;
+
+        pm->watertype = cont;
+        pm->waterlevel = 1;
+        point[2] = pm->ps->origin[2] + MINS_Z + sample1;
+        cont = pm->pointcontents (point, pm->ps->clientNum );
+        if ( cont & MASK_WATER ) {
+            pm->waterlevel = 2;
+            point[2] = pm->ps->origin[2] + MINS_Z + sample2;
+            cont = pm->pointcontents (point, pm->ps->clientNum );
+            if ( cont & MASK_WATER ){
+                pm->waterlevel = 3;
+            }
+        }
+    }
+
+}
+
+static void PM_CheckDuck (void)
+{
+    trace_t trace;
+
+    if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
+        if ( pm->ps->pm_flags & PMF_INVULEXPAND ) {
+            // invulnerability sphere has a 42 units radius
+            VectorSet( pm->mins, -42, -42, -42 );
+            VectorSet( pm->maxs, 42, 42, 42 );
+        }
+        else {
+            VectorSet( pm->mins, -15, -15, MINS_Z );
+            VectorSet( pm->maxs, 15, 15, 16 );
+        }
+        pm->ps->pm_flags |= PMF_DUCKED;
+        pm->ps->viewheight = CROUCH_VIEWHEIGHT;
+        return;
+    }
+    pm->ps->pm_flags &= ~PMF_INVULEXPAND;
+
+    pm->mins[0] = -15;
+    pm->mins[1] = -15;
+
+    pm->maxs[0] = 15;
+    pm->maxs[1] = 15;
+
+    pm->mins[2] = MINS_Z;
+
+    if (pm->ps->pm_type == PM_DEAD)
+    {
+        pm->maxs[2] = -8;
+        pm->ps->viewheight = DEAD_VIEWHEIGHT;
+        return;
+    }
+
+    if (pm->cmd.upmove < 0)
+    {   // duck
+        pm->ps->pm_flags |= PMF_DUCKED;
+    }
+    else
+    {   // stand up if possible
+        if (pm->ps->pm_flags & PMF_DUCKED)
+        {
+            // try to stand up
+            pm->maxs[2] = 32;
+            pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
+            if (!trace.allsolid)
+                pm->ps->pm_flags &= ~PMF_DUCKED;
+        }
+    }
+
+    if (pm->ps->pm_flags & PMF_DUCKED)
+    {
+        pm->maxs[2] = 16;
+        pm->ps->viewheight = CROUCH_VIEWHEIGHT;
+    }
+    else
+    {
+        pm->maxs[2] = 32;
+        pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
+    }
+}
+
+static void PM_Footsteps( void ) {
+    float       bobmove;
+    int         old;
+    qboolean    footstep;
+
+    //
+    // calculate speed and cycle to be used for
+    // all cyclic walking effects
+    //
+    pm->xyspeed = sqrt( pm->ps->velocity[0] * pm->ps->velocity[0]
+        +  pm->ps->velocity[1] * pm->ps->velocity[1] );
+
+    if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
+
+        if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
+            PM_ContinueLegsAnim( LEGS_IDLECR );
+        }
+        // airborne leaves position in cycle intact, but doesn't advance
+        if ( pm->waterlevel > 1 ) {
+            PM_ContinueLegsAnim( LEGS_SWIM );
+        }
+        return;
+    }
+
+    // if not trying to move
+    if ( !pm->cmd.forwardmove && !pm->cmd.rightmove ) {
+        if (  pm->xyspeed < 5 ) {
+            pm->ps->bobCycle = 0;   // start at beginning of cycle again
+            if ( pm->ps->pm_flags & PMF_DUCKED ) {
+                PM_ContinueLegsAnim( LEGS_IDLECR );
+            } else {
+                PM_ContinueLegsAnim( LEGS_IDLE );
+            }
+        }
+        return;
+    }
+
+
+    footstep = qfalse;
+
+    if ( pm->ps->pm_flags & PMF_DUCKED ) {
+        bobmove = 0.5;  // ducked characters bob much faster
+        if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
+            PM_ContinueLegsAnim( LEGS_BACKCR );
+        }
+        else {
+            PM_ContinueLegsAnim( LEGS_WALKCR );
+        }
+        // ducked characters never play footsteps
+    /*
+    } else  if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
+        if ( !( pm->cmd.buttons & BUTTON_WALKING ) ) {
+            bobmove = 0.4;  // faster speeds bob faster
+            footstep = qtrue;
+        } else {
+            bobmove = 0.3;
+        }
+        PM_ContinueLegsAnim( LEGS_BACK );
+    */
+    } else {
+        if ( !( pm->cmd.buttons & BUTTON_WALKING ) ) {
+            bobmove = 0.4f; // faster speeds bob faster
+            if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
+                PM_ContinueLegsAnim( LEGS_BACK );
+            }
+            else {
+                PM_ContinueLegsAnim( LEGS_RUN );
+            }
+            footstep = qtrue;
+        } else {
+            bobmove = 0.3f; // walking bobs slow
+            if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
+                PM_ContinueLegsAnim( LEGS_BACKWALK );
+            }
+            else {
+                PM_ContinueLegsAnim( LEGS_WALK );
+            }
+        }
+    }
+
+    // check for footstep / splash sounds
+    old = pm->ps->bobCycle;
+    pm->ps->bobCycle = (int)( old + bobmove * pml.msec ) & 255;
+
+    // if we just crossed a cycle boundary, play an apropriate footstep event
+    if ( ( ( old + 64 ) ^ ( pm->ps->bobCycle + 64 ) ) & 128 ) {
+        if ( pm->waterlevel == 0 ) {
+            // on ground will only play sounds if running
+            if ( footstep && !pm->noFootsteps ) {
+                PM_AddEvent( PM_FootstepForSurface() );
+            }
+        } else if ( pm->waterlevel == 1 ) {
+            // splashing
+            PM_AddEvent( EV_FOOTSPLASH );
+        } else if ( pm->waterlevel == 2 ) {
+            // wading / swimming at surface
+            PM_AddEvent( EV_SWIM );
+        } else if ( pm->waterlevel == 3 ) {
+            // no sound when completely underwater
+
+        }
+    }
+}
+
+static void PM_WaterEvents( void ) {        // FIXME?
+    //
+    // if just entered a water volume, play a sound
+    //
+    if (!pml.previous_waterlevel && pm->waterlevel) {
+        PM_AddEvent( EV_WATER_TOUCH );
+    }
+
+    //
+    // if just completely exited a water volume, play a sound
+    //
+    if (pml.previous_waterlevel && !pm->waterlevel) {
+        PM_AddEvent( EV_WATER_LEAVE );
+    }
+
+    //
+    // check for head just going under water
+    //
+    if (pml.previous_waterlevel != 3 && pm->waterlevel == 3) {
+        PM_AddEvent( EV_WATER_UNDER );
+    }
+
+    //
+    // check for head just coming out of water
+    //
+    if (pml.previous_waterlevel == 3 && pm->waterlevel != 3) {
+        PM_AddEvent( EV_WATER_CLEAR );
+    }
+}
