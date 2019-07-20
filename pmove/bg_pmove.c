@@ -1,7 +1,10 @@
 #define PMF_PROMODE 0x8000
-// needs to be moved to statIndex_t one day
+// TODO: needs to be moved to statIndex_t one day
 #define STAT_JUMPTIME 10
 #define STAT_DJING 11
+// TODO: needs to be moved to surfaceflags.h or whatever
+#define SURF_NOOB 0x80000
+
 
 void PM_AddEvent( int newEvent ) {
     BG_AddPredictableEventToPlayerstate( newEvent, 0, pm->ps );
@@ -1006,4 +1009,104 @@ static void PM_GroundTraceMissed( void ) {
     pm->ps->groundEntityNum = ENTITYNUM_NONE;
     pml.groundPlane = qfalse;
     pml.walking = qfalse;
+}
+
+static void PM_GroundTrace( void ) {
+    vec3_t      point;
+    trace_t     trace;
+
+    point[0] = pm->ps->origin[0];
+    point[1] = pm->ps->origin[1];
+    point[2] = pm->ps->origin[2] - 0.25;
+
+    pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+    pml.groundTrace = trace;
+
+    // do something corrective if the trace starts in a solid...
+    if ( trace.allsolid ) {
+        if ( !PM_CorrectAllSolid(&trace) )
+            return;
+    }
+
+    // if the trace didn't hit anything, we are in free fall
+    if ( trace.fraction == 1.0 ) {
+        PM_GroundTraceMissed();
+        pml.groundPlane = qfalse;
+        pml.walking = qfalse;
+        return;
+    }
+
+    // check if getting thrown off the ground
+    if ( pm->ps->velocity[2] > 0 && DotProduct( pm->ps->velocity, trace.plane.normal ) > 10 ) {
+        if ( pm->debugLevel ) {
+            Com_Printf("%i:kickoff\n", c_pmove);
+        }
+        // go into jump animation
+        if ( pm->cmd.forwardmove >= 0 ) {
+            PM_ForceLegsAnim( LEGS_JUMP );
+            pm->ps->pm_flags &= ~PMF_BACKWARDS_JUMP;
+        } else {
+            PM_ForceLegsAnim( LEGS_JUMPB );
+            pm->ps->pm_flags |= PMF_BACKWARDS_JUMP;
+        }
+
+        pm->ps->groundEntityNum = ENTITYNUM_NONE;
+        pml.groundPlane = qfalse;
+        pml.walking = qfalse;
+        return;
+    }
+
+    // slopes that are too steep will not be considered onground
+    if ( trace.plane.normal[2] < MIN_WALK_NORMAL ) {
+        if ( pm->debugLevel ) {
+            Com_Printf("%i:steep\n", c_pmove);
+        }
+        // FIXME: if they can't slide down the slope, let them
+        // walk (sharp crevices)
+        pm->ps->groundEntityNum = ENTITYNUM_NONE;
+        pml.groundPlane = qtrue;
+        pml.walking = qfalse;
+        return;
+    }
+
+    pml.groundPlane = qtrue;
+    pml.walking = qtrue;
+
+    // hitting solid ground will end a waterjump
+    if (pm->ps->pm_flags & PMF_TIME_WATERJUMP)
+    {
+        pm->ps->pm_flags &= ~(PMF_TIME_WATERJUMP | PMF_TIME_LAND);
+        pm->ps->pm_time = 0;
+    }
+
+    if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
+        // just hit the ground
+        if ( pm->debugLevel ) {
+            Com_Printf("%i:Land\n", c_pmove);
+        }
+
+        PM_CrashLand();
+
+        if ( (pm->ps->stats[12] & 0x200) || (pml.groundTrace.surfaceFlags & SURF_NOOB) ) {
+            PM_ClipVelocity(pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP);
+        }
+
+        // don't do landing time if we were just going down a slope
+        if ( pml.previous_velocity[2] < -200 ) {
+            // don't allow another jump for a little while
+            pm->ps->pm_flags |= PMF_TIME_LAND;
+            pm->ps->pm_time = 250;
+        }
+    }
+
+    pm->ps->groundEntityNum = trace.entityNum;
+
+    if ( ((pm->ps->stats[12] & 0x200) || (pml.groundTrace.surfaceFlags & SURF_NOOB)) && trace.plane.normal[2] == 1.0f ) {
+        pm->ps->velocity[2] = 0;
+    }
+
+    // don't reset the z velocity for slopes
+//  pm->ps->velocity[2] = 0;
+
+    PM_AddTouchEnt( trace.entityNum );
 }
