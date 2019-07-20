@@ -552,8 +552,7 @@ static float PM_HookSpeed( void ) {
     return hook_speed;
 }
 
-// TODO: name this
-static void sub_00006eba( void ) {
+static void PM_Q2GrappleMove( void ) {
     vec3_t vel, v;
     float hook_speed, vlen;
 
