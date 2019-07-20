@@ -775,3 +775,235 @@ static void PM_WalkMove( void ) {
 
     PM_StepSlideMove( qfalse );
 }
+
+static void PM_DeadMove( void ) {
+    float   forward;
+
+    if ( !pml.walking ) {
+        return;
+    }
+
+    // extra friction
+
+    forward = VectorLength (pm->ps->velocity);
+    forward -= 20;
+    if ( forward <= 0 ) {
+        VectorClear (pm->ps->velocity);
+    } else {
+        VectorNormalize (pm->ps->velocity);
+        VectorScale (pm->ps->velocity, forward, pm->ps->velocity);
+    }
+}
+
+static void PM_NoclipMove( void ) {
+    float   speed, drop, friction, control, newspeed;
+    int         i;
+    vec3_t      wishvel;
+    float       fmove, smove;
+    vec3_t      wishdir;
+    float       wishspeed;
+    float       scale;
+
+    pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
+
+    // friction
+
+    speed = VectorLength (pm->ps->velocity);
+    if (speed < 1)
+    {
+        VectorCopy (vec3_origin, pm->ps->velocity);
+    }
+    else
+    {
+        drop = 0;
+
+        friction = pm_friction*1.5; // extra friction
+        control = speed < pm_stopspeed ? pm_stopspeed : speed;
+        drop += control*friction*pml.frametime;
+
+        // scale the velocity
+        newspeed = speed - drop;
+        if (newspeed < 0)
+            newspeed = 0;
+        newspeed /= speed;
+
+        VectorScale (pm->ps->velocity, newspeed, pm->ps->velocity);
+    }
+
+    // accelerate
+    scale = PM_CmdScale( &pm->cmd );
+
+    fmove = pm->cmd.forwardmove;
+    smove = pm->cmd.rightmove;
+
+    for (i=0 ; i<3 ; i++)
+        wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
+    wishvel[2] += pm->cmd.upmove;
+
+    VectorCopy (wishvel, wishdir);
+    wishspeed = VectorNormalize(wishdir);
+    wishspeed *= scale;
+
+    PM_Accelerate( wishdir, wishspeed, pm_accelerate );
+
+    // move
+    VectorMA (pm->ps->origin, pml.frametime, pm->ps->velocity, pm->ps->origin);
+}
+
+static int PM_FootstepForSurface( void ) {
+    if ( pml.groundTrace.surfaceFlags & SURF_NOSTEPS ) {
+        return 0;
+    }
+    if ( pml.groundTrace.surfaceFlags & SURF_METALSTEPS ) {
+        return EV_FOOTSTEP_METAL;
+    }
+    return EV_FOOTSTEP;
+}
+
+static void PM_CrashLand( void ) {
+    float       delta;
+    float       dist;
+    float       vel, acc;
+    float       t;
+    float       a, b, c, den;
+
+    // decide which landing animation to use
+    if ( pm->ps->pm_flags & PMF_BACKWARDS_JUMP ) {
+        PM_ForceLegsAnim( LEGS_LANDB );
+    } else {
+        PM_ForceLegsAnim( LEGS_LAND );
+    }
+
+    pm->ps->legsTimer = TIMER_LAND;
+
+    // calculate the exact velocity on landing
+    dist = pm->ps->origin[2] - pml.previous_origin[2];
+    vel = pml.previous_velocity[2];
+    acc = -pm->ps->gravity;
+
+    a = acc / 2;
+    b = vel;
+    c = -dist;
+
+    den =  b * b - 4 * a * c;
+    if ( den < 0 ) {
+        return;
+    }
+    t = (-b - sqrt( den ) ) / ( 2 * a );
+
+    delta = vel + t * acc;
+    delta = delta*delta * 0.0001;
+
+    // ducking while falling doubles damage
+    if ( pm->ps->pm_flags & PMF_DUCKED ) {
+        delta *= 2;
+    }
+
+    // never take falling damage if completely underwater
+    if ( pm->waterlevel == 3 ) {
+        return;
+    }
+
+    // reduce falling damage if there is standing water
+    if ( pm->waterlevel == 2 ) {
+        delta *= 0.25;
+    }
+    if ( pm->waterlevel == 1 ) {
+        delta *= 0.5;
+    }
+
+    if ( delta < 1 ) {
+        return;
+    }
+
+    // create a local entity event to play the sound
+
+    // SURF_NODAMAGE is used for bounce pads where you don't ever
+    // want to take damage or play a crunch sound
+    if ( !(pml.groundTrace.surfaceFlags & SURF_NODAMAGE) )  {
+        if ( delta > 60 ) {
+            PM_AddEvent( EV_FALL_FAR );
+        } else if ( delta > 40 ) {
+            // this is a pain grunt, so don't play it if dead
+            if ( pm->ps->stats[STAT_HEALTH] > 0 ) {
+                PM_AddEvent( EV_FALL_MEDIUM );
+            }
+        } else if ( delta > 7 ) {
+            PM_AddEvent( EV_FALL_SHORT );
+        } else {
+            PM_AddEvent( PM_FootstepForSurface() );
+        }
+    }
+
+    // start footstep cycle over
+    pm->ps->bobCycle = 0;
+}
+
+static int PM_CorrectAllSolid( trace_t *trace ) {
+    int         i, j, k;
+    vec3_t      point;
+
+    if ( pm->debugLevel ) {
+        Com_Printf("%i:allsolid\n", c_pmove);
+    }
+
+    // jitter around
+    for (i = -1; i <= 1; i++) {
+        for (j = -1; j <= 1; j++) {
+            for (k = -1; k <= 1; k++) {
+                VectorCopy(pm->ps->origin, point);
+                point[0] += (float) i;
+                point[1] += (float) j;
+                point[2] += (float) k;
+                pm->trace (trace, point, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+                if ( !trace->allsolid ) {
+                    point[0] = pm->ps->origin[0];
+                    point[1] = pm->ps->origin[1];
+                    point[2] = pm->ps->origin[2] - 0.25;
+
+                    pm->trace (trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+                    pml.groundTrace = *trace;
+                    return qtrue;
+                }
+            }
+        }
+    }
+
+    pm->ps->groundEntityNum = ENTITYNUM_NONE;
+    pml.groundPlane = qfalse;
+    pml.walking = qfalse;
+
+    return qfalse;
+}
+
+static void PM_GroundTraceMissed( void ) {
+    trace_t     trace;
+    vec3_t      point;
+
+    if ( pm->ps->groundEntityNum != ENTITYNUM_NONE ) {
+        // we just transitioned into freefall
+        if ( pm->debugLevel ) {
+            Com_Printf("%i:lift\n", c_pmove);
+        }
+
+        // if they aren't in a jumping animation and the ground is a ways away, force into it
+        // if we didn't do the trace, the player would be backflipping down staircases
+        VectorCopy( pm->ps->origin, point );
+        point[2] -= 64;
+
+        pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
+        if ( trace.fraction == 1.0 ) {
+            if ( pm->cmd.forwardmove >= 0 ) {
+                PM_ForceLegsAnim( LEGS_JUMP );
+                pm->ps->pm_flags &= ~PMF_BACKWARDS_JUMP;
+            } else {
+                PM_ForceLegsAnim( LEGS_JUMPB );
+                pm->ps->pm_flags |= PMF_BACKWARDS_JUMP;
+            }
+        }
+    }
+
+    pm->ps->groundEntityNum = ENTITYNUM_NONE;
+    pml.groundPlane = qfalse;
+    pml.walking = qfalse;
+}
