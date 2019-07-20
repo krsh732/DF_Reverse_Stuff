@@ -544,16 +544,36 @@ static void PM_GrappleMove( void ) {
     pml.groundPlane = qfalse;
 }
 
-// what to call this?
-static float sub_00006ea3( void ) {
-    float hook_speed = 800; // guess?
+static float PM_HookSpeed( void ) {
+    float hook_speed = 800;
     if ( pm->ps->powerups[PW_HASTE] ) {
         hook_speed *= 1.3;
     }
     return hook_speed;
 }
 
-// TODO: sub_00006eba
+// TODO: name this
+static void sub_00006eba( void ) {
+    vec3_t vel, v;
+    float hook_speed, vlen;
+
+    hook_speed = PM_HookSpeed();
+    VectorScale(pml.forward, -16, v);
+    VectorAdd(pm->ps->grapplePoint, v, v);
+    VectorSubtract(v, pm->ps->origin, vel);
+    vel[2] -= pm->ps->viewheight - 4.0;
+    vlen = VectorLength(vel);
+    VectorNormalize( vel );
+
+    if (vlen <= 100)
+        VectorScale(vel, (hook_speed / 100.0) * vlen, vel);
+    else
+        VectorScale(vel, hook_speed, vel);
+
+    VectorCopy(vel, pm->ps->velocity);
+
+    pml.groundPlane = qfalse;
+}
 
 // TODO: sub_00006f8b
 
