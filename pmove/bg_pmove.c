@@ -546,9 +546,11 @@ static void PM_GrappleMove( void ) {
 
 static float PM_HookSpeed( void ) {
     float hook_speed = 800;
+
     if ( pm->ps->powerups[PW_HASTE] ) {
         hook_speed *= 1.3;
     }
+
     return hook_speed;
 }
 
@@ -574,7 +576,6 @@ static void PM_Q2GrappleMove( void ) {
     pml.groundPlane = qfalse;
 }
 
-// TODO: name the vars properly
 static void PM_SwingingGrappleMove( void ) {
     vec3_t hook_dir;
     float hook_dist, hook_speed;
