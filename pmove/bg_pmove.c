@@ -562,7 +562,7 @@ static void PM_Q2GrappleMove( void ) {
     VectorScale(pml.forward, -16, v);
     VectorAdd(pm->ps->grapplePoint, v, v);
     VectorSubtract(v, pm->ps->origin, vel);
-    vel[2] -= pm->ps->viewheight - 4.0;
+    vel[2] = (vel[2] - pm->ps->viewheight) - 4.0;
     vlen = VectorLength(vel);
     VectorNormalize( vel );
 
