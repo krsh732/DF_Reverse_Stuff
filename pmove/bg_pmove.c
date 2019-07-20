@@ -1681,3 +1681,55 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
     }
 
 }
+
+// TODO: sub_000081a1 (PmoveSingle)
+
+void Pmove (pmove_t *pmove) {
+    int         finalTime;
+
+    finalTime = pmove->cmd.serverTime;
+
+    if ( finalTime < pmove->ps->commandTime || pmove->ps->commandTime == 0 ) {
+        pmove->mins[0] = -15.0;
+        pmove->mins[1] = -15.0;
+        pmove->maxs[0] = 15.0;
+        pmove->maxs[1] = 15.0;
+        pmove->mins[2] = -24.0;
+        pmove->maxs[2] = 32.0;
+        return;
+    }
+
+    if ( finalTime > pmove->ps->commandTime + 1000 ) {
+        pmove->ps->commandTime = finalTime;
+    }
+
+    pmove->ps->pmove_framecount = (pmove->ps->pmove_framecount+1) & ((1<<PS_PMOVEFRAMECOUNTBITS)-1);
+
+    // chop the move up if it is too long, to prevent framerate
+    // dependent behavior
+    while ( pmove->ps->commandTime != finalTime ) {
+        int     msec;
+
+        msec = finalTime - pmove->ps->commandTime;
+
+        if ( pmove->pmove_fixed ) {
+            if ( msec > pmove->pmove_msec ) {
+                msec = pmove->pmove_msec;
+            }
+        }
+        else {
+            if ( msec > 66 ) {
+                msec = 66;
+            }
+        }
+        pmove->cmd.serverTime = pmove->ps->commandTime + msec;
+        PmoveSingle( pmove );
+
+        if ( pmove->ps->pm_flags & PMF_JUMP_HELD ) {
+            pmove->cmd.upmove = 20;
+        }
+    }
+
+    //PM_CheckStuck();
+
+}
