@@ -1344,3 +1344,32 @@ static void PM_WaterEvents( void ) {        // FIXME?
         PM_AddEvent( EV_WATER_CLEAR );
     }
 }
+
+static void PM_BeginWeaponChange( int weapon ) {
+    if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+        return;
+    }
+
+    if ( !( pm->ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
+        return;
+    }
+
+    if ( weapon == WP_GRAPPLING_HOOK ) {
+        return;
+    }
+
+    if ( pm->ps->weaponstate == WEAPON_DROPPING ) {
+        return;
+    }
+
+    PM_AddEvent( EV_CHANGE_WEAPON );
+    pm->ps->weaponstate = WEAPON_DROPPING;
+    if( pm->ps->pm_flags & PMF_PROMODE ) {
+        // did someone really write this?
+        // maybe the if-else is supposed to be ternary?
+        pm->ps->weaponTime = pm->ps->weaponTime;
+    } else {
+        pm->ps->weaponTime += 200;
+    }
+    PM_StartTorsoAnim( TORSO_DROP );
+}
