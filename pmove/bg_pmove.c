@@ -613,8 +613,42 @@ static void PM_PendulumGrappleMove( void ) {
     pml.groundPlane = qfalse;
 }
 
+static void PM_DFGrappleMove( void ) {
+    int hook_type = 0;
+    if ( pm->ps->stats[12] & 0x400 ) hook_type += 1;
+    if ( pm->ps->stats[12] & 0x800 ) hook_type += 2;
 
-// TODO: sub_00007078
+    switch( hook_type ) {
+        default:
+        case 0:
+            PM_GrappleMove();
+            PM_AirMove();
+            break;
+
+        case 1:
+            PM_SwingingGrappleMove();
+            if ( pml.walking ) {
+                PM_WalkMove();
+            } else {
+                PM_AirMove();
+            }
+            break;
+
+        case 2:
+            PM_PendulumGrappleMove();
+            if ( pml.walking ) {
+                PM_WalkMove();
+            } else {
+                PM_AirMove();
+            }
+            break;
+
+        case 3:
+            PM_Q2GrappleMove();
+            PM_AirMove();
+            break;
+    }
+}
 
 static void PM_WalkMove( void ) {
     int         i;
