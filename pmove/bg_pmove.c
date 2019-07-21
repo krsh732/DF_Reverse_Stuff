@@ -1682,7 +1682,239 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 
 }
 
-// TODO: sub_000081a1 (PmoveSingle)
+// TODO: name this
+qboolean check_walking_3fe1( pmove_t *pmove ) {
+    // return abs( pmove->cmd.forwardmove ) == 64 || abs( pmove->cmd.rightmove ) == 64;
+    // but disassembly looks like it maybe be something like this
+
+    if ( abs( pmove->cmd.forwardmove ) == 64 ) {
+        return qtrue;
+    } else if ( abs( pmove->cmd.rightmove ) == 64 ) {
+        return qtrue;
+    } else {
+        return qfalse;
+    }
+}
+
+// TODO: name this
+void set_stats_13_00004011( pmove_t *pmove ) {
+    // TODO: name stats[13] and the flags it contains
+    pmove->ps->stats[13] = 0;
+    if ( pmove->cmd.forwardmove > 0 ) {
+        pmove->ps->stats[13] |= 1;
+    }
+    if ( pmove->cmd.forwardmove < 0 ) {
+        pmove->ps->stats[13] |= 2;
+    }
+    if ( pmove->cmd.rightmove < 0 ) {
+        pmove->ps->stats[13] |= 8;
+    }
+    if ( pmove->cmd.rightmove > 0 ) {
+        pmove->ps->stats[13] |= 0x10;
+    }
+    if ( pmove->cmd.upmove > 0 ) {
+        pmove->ps->stats[13] |= 0x20;
+    }
+    if ( pmove->cmd.upmove < 0 ) {
+        pmove->ps->stats[13] |= 0x40;
+    }
+    if ( pmove->cmd.buttons & 1 ) {
+        pmove->ps->stats[13] |= 0x100;
+    }
+    if ( check_walking_3fe1( pmove ) ) {
+        pmove->ps->stats[13] |= 0x200;
+    }
+}
+
+void PmoveSingle (pmove_t *pmove) {
+    set_stats_13_00004011();
+
+    pm = pmove;
+
+    // this counter lets us debug movement problems with a journal
+    // by setting a conditional breakpoint fot the previous frame
+    c_pmove++;
+
+    // clear results
+    pm->numtouch = 0;
+    pm->watertype = 0;
+    pm->waterlevel = 0;
+
+    if ( pm->ps->stats[STAT_HEALTH] <= 0 ) {
+        pm->tracemask &= ~CONTENTS_BODY;    // corpses can fly through bodies
+    }
+
+    // make sure walking button is clear if they are running, to avoid
+    // proxy no-footsteps cheats
+    if ( abs( pm->cmd.forwardmove ) > 64 || abs( pm->cmd.rightmove ) > 64 ) {
+        pm->cmd.buttons &= ~BUTTON_WALKING;
+    }
+
+    // set the talk balloon flag
+    if ( pm->cmd.buttons & BUTTON_TALK ) {
+        pm->ps->eFlags |= EF_TALK;
+    } else {
+        pm->ps->eFlags &= ~EF_TALK;
+    }
+
+    // set the firing flag for continuous beam weapons
+    if ( !(pm->ps->pm_flags & PMF_RESPAWNED) && pm->ps->pm_type != PM_INTERMISSION
+        && ( pm->cmd.buttons & BUTTON_ATTACK ) && pm->ps->ammo[ pm->ps->weapon ] ) {
+        pm->ps->eFlags |= EF_FIRING;
+    } else {
+        pm->ps->eFlags &= ~EF_FIRING;
+    }
+
+    // clear the respawned flag if attack and use are cleared
+    if ( pm->ps->stats[STAT_HEALTH] > 0 && 
+        !( pm->cmd.buttons & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE) ) ) {
+        pm->ps->pm_flags &= ~PMF_RESPAWNED;
+    }
+
+    // if talk button is down, dissallow all other input
+    // this is to prevent any possible intercept proxy from
+    // adding fake talk balloons
+    if ( pmove->cmd.buttons & BUTTON_TALK ) {
+        // keep the talk button set tho for when the cmd.serverTime > 66 msec
+        // and the same cmd is used multiple times in Pmove
+        pmove->cmd.buttons = BUTTON_TALK;
+        pmove->cmd.forwardmove = 0;
+        pmove->cmd.rightmove = 0;
+        pmove->cmd.upmove = 0;
+    }
+
+    // clear all pmove local vars
+    memset (&pml, 0, sizeof(pml));
+
+    // determine the time
+    pml.msec = pmove->cmd.serverTime - pm->ps->commandTime;
+    if ( pml.msec < 1 ) {
+        pml.msec = 1;
+    } else if ( pml.msec > 200 ) {
+        pml.msec = 200;
+    }
+    pm->ps->commandTime = pmove->cmd.serverTime;
+
+    // save old org in case we get stuck
+    VectorCopy (pm->ps->origin, pml.previous_origin);
+
+    // save old velocity for crashlanding
+    VectorCopy (pm->ps->velocity, pml.previous_velocity);
+
+    pml.frametime = pml.msec * 0.001;
+
+    // update the viewangles
+    PM_UpdateViewAngles( pm->ps, &pm->cmd );
+
+    AngleVectors (pm->ps->viewangles, pml.forward, pml.right, pml.up);
+
+    if ( pm->cmd.upmove < 10 ) {
+        // not holding jump
+        pm->ps->pm_flags &= ~PMF_JUMP_HELD;
+    }
+
+    // decide if backpedaling animations should be used
+    if ( pm->cmd.forwardmove < 0 ) {
+        pm->ps->pm_flags |= PMF_BACKWARDS_RUN;
+    } else if ( pm->cmd.forwardmove > 0 || ( pm->cmd.forwardmove == 0 && pm->cmd.rightmove ) ) {
+        pm->ps->pm_flags &= ~PMF_BACKWARDS_RUN;
+    }
+
+    if ( pm->ps->pm_type >= PM_DEAD ) {
+        pm->cmd.forwardmove = 0;
+        pm->cmd.rightmove = 0;
+        pm->cmd.upmove = 0;
+    }
+
+    if ( pm->ps->pm_type == PM_SPECTATOR ) {
+        PM_CheckDuck ();
+        PM_FlyMove ();
+        PM_DropTimers ();
+        return;
+    }
+
+    if ( pm->ps->pm_type == PM_NOCLIP ) {
+        PM_NoclipMove ();
+        PM_DropTimers ();
+        return;
+    }
+
+    if (pm->ps->pm_type == PM_FREEZE) {
+        return;     // no movement at all
+    }
+
+    if ( pm->ps->pm_type == PM_INTERMISSION || pm->ps->pm_type == PM_SPINTERMISSION) {
+        return;     // no movement at all
+    }
+
+    // set watertype, and waterlevel
+    PM_SetWaterLevel();
+    pml.previous_waterlevel = pmove->waterlevel;
+
+    // set mins, maxs, and viewheight
+    PM_CheckDuck ();
+
+    // set groundentity
+    PM_GroundTrace();
+
+    if ( pm->ps->pm_type == PM_DEAD ) {
+        PM_DeadMove ();
+    }
+
+    PM_DropTimers();
+
+    if ( pm->ps->pm_flags & PMF_PROMODE ) {
+        if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
+            pm->ps->stats[STAT_JUMPTIME] -= pml_msec;
+        } else if ( pm->ps->stats[STAT_DJING] ) {
+            pm->ps->stats[STAT_DJING] = 0;
+        }
+    }
+
+#ifdef MISSIONPACK
+    if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
+        PM_InvulnerabilityMove();
+    } else
+#endif
+    if ( pm->ps->powerups[PW_FLIGHT] ) {
+        // flight powerup doesn't allow jump and has different friction
+        PM_FlyMove();
+    } else if (pm->ps->pm_flags & PMF_GRAPPLE_PULL) {
+        PM_DFGrappleMove();
+    } else if (pm->ps->pm_flags & PMF_TIME_WATERJUMP) {
+        PM_WaterJumpMove();
+    } else if ( pm->waterlevel > 1 ) {
+        // swimming
+        PM_WaterMove();
+    } else if ( pml.walking ) {
+        // walking on ground
+        PM_WalkMove();
+    } else {
+        // airborne
+        PM_AirMove();
+    }
+
+    PM_Animate();
+
+    // set groundentity, watertype, and waterlevel
+    PM_GroundTrace();
+    PM_SetWaterLevel();
+
+    // weapons
+    PM_Weapon();
+
+    // torso animation
+    PM_TorsoAnimation();
+
+    // footstep events / legs animations
+    PM_Footsteps();
+
+    // entering / leaving water splashes
+    PM_WaterEvents();
+
+    // snap some parts of playerstate to save network bandwidth
+    trap_SnapVector( pm->ps->velocity );
+}
 
 void Pmove (pmove_t *pmove) {
     int         finalTime;
