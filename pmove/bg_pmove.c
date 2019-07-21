@@ -439,7 +439,7 @@ static void PM_FlyMove( void ) {
     PM_StepSlideMove( qfalse );
 }
 
-// Note: This actually should be in some other file, but is only used here...
+// NOTE: This actually should be in some other file, but is only used here...
 static void PM_AirControl(pmove_t *pm, vec3_t wishdir, float wishspeed) {
     float zspeed, speed, dot, k;
 

@@ -1,6 +1,6 @@
 #define MAX_CLIP_PLANES 5
 
-// Note: This actually should be in some other file, but is only used here...
+// NOTE: This actually should be in some other file, but is only used here...
 void PM_FlatClipVelocity( vec3_t in, vec3_t normal, vec3_t out, float overbounce ) {
     float   backoff;
     float   change;
