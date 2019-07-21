@@ -1868,7 +1868,7 @@ void PmoveSingle (pmove_t *pmove) {
 
     if ( pm->ps->pm_flags & PMF_PROMODE ) {
         if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
-            pm->ps->stats[STAT_JUMPTIME] -= pml_msec;
+            pm->ps->stats[STAT_JUMPTIME] -= pml.msec;
         } else if ( pm->ps->stats[STAT_DJING] ) {
             pm->ps->stats[STAT_DJING] = 0;
         }
