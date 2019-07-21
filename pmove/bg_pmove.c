@@ -439,6 +439,7 @@ static void PM_FlyMove( void ) {
     PM_StepSlideMove( qfalse );
 }
 
+// Note: This actually should be in some other file, but is only used here...
 static void PM_AirControl(pmove_t *pm, vec3_t wishdir, float wishspeed) {
     float zspeed, speed, dot, k;
 
@@ -1682,8 +1683,9 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 
 }
 
-// TODO: name this
-qboolean check_walking_3fe1( pmove_t *pmove ) {
+// TODO: name this better maybe
+// NOTE: This actually should be in some other file, but is only used here...
+qboolean is_walking( pmove_t *pmove ) {
     // return abs( pmove->cmd.forwardmove ) == 64 || abs( pmove->cmd.rightmove ) == 64;
     // but disassembly looks like it maybe be something like this
 
@@ -1696,8 +1698,9 @@ qboolean check_walking_3fe1( pmove_t *pmove ) {
     }
 }
 
-// TODO: name this
-void set_stats_13_00004011( pmove_t *pmove ) {
+// TODO: name this better maybe
+// NOTE: This actually should be in some other file, but is only used here...
+void set_stats_13( pmove_t *pmove ) {
     // TODO: name stats[13] and the flags it contains
     pmove->ps->stats[13] = 0;
     if ( pmove->cmd.forwardmove > 0 ) {
@@ -1721,13 +1724,13 @@ void set_stats_13_00004011( pmove_t *pmove ) {
     if ( pmove->cmd.buttons & 1 ) {
         pmove->ps->stats[13] |= 0x100;
     }
-    if ( check_walking_3fe1( pmove ) ) {
+    if ( is_walking( pmove ) ) {
         pmove->ps->stats[13] |= 0x200;
     }
 }
 
 void PmoveSingle (pmove_t *pmove) {
-    set_stats_13_00004011();
+    set_stats_13();
 
     pm = pmove;
 
@@ -1766,7 +1769,7 @@ void PmoveSingle (pmove_t *pmove) {
     }
 
     // clear the respawned flag if attack and use are cleared
-    if ( pm->ps->stats[STAT_HEALTH] > 0 && 
+    if ( pm->ps->stats[STAT_HEALTH] > 0 &&
         !( pm->cmd.buttons & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE) ) ) {
         pm->ps->pm_flags &= ~PMF_RESPAWNED;
     }
