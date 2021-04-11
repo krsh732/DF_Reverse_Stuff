@@ -1,3 +1,10 @@
-timeInfo_t[MAX_CLIENTS] qagame array:
+qagame timeInfo_t timers[MAX_CLIENTS]:
 	.24: 0x12caa0
 	.25: 0x12cb60
+	.27: 0x1318b8
+
+cgame uint decrypted_timer:
+	.27: 0x11d31c
+
+cgame uint DecryptTimer(snapshot_t *, snapshot_t *):
+	.27: 0x5f5e
