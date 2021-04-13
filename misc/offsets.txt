@@ -1,0 +1,19 @@
+.27 cgame:
+    CG_SavePos_F = 0xade1
+    &commands[i].cmd = 0x2894 for i where commands[i].cmd == CG_SavePos_f
+    atoi = 0x2f523
+    Q_stricmp = 0x324d6
+    CG_Printf = 0x23c
+    strlen = 0x2f1b8
+    sprintf = 0x77b6
+    cg.time = 0xcfc4c - 36 + 0x1a454
+
+.27 qagame:
+    Cmd_PlacePlayer_f = 0x4624
+    get_cheats_enabled = 0x3dba
+    atof = 0x5d6d
+    atoi = 0x5efd
+    timers = 0x1318b8
+    placeplayer_teleport = 0x4586
+    level.time = 0x12a2ec
+    g_entities = 0x1b2cc
