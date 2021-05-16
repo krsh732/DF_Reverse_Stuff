@@ -32,5 +32,8 @@ typedef struct {
     int         teamVoteCount;      // to prevent people from constantly calling votes
     qboolean    teamInfo;           // send team overlay updates?
     char        dfName[20];
+#ifdef DF_1_91_27
+    int         fastRespawn;
+#endif
     voteState_t voteState;
 } clientPersistant_t;

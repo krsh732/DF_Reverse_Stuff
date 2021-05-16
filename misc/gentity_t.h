@@ -69,6 +69,9 @@ struct gentity_s {
     float wait;
     float random;
     gitem_t *item;
-    int unknown; // TODO: reverse this?
+    int unknown_ptr; // TODO: reverse this?
     int waittable[MAX_CLIENTS];
+#ifdef DF_1_91_27
+    int unknown[4]; // seeing some stuff in G_UseTargets, possibly due to nicemap3?
+#endif
 };
